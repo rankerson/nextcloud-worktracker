@@ -89,6 +89,9 @@ class Version1000Date20261110130000 extends SimpleMigrationStep {
         }
         $table->addColumn('start_ts', 'bigint', ['notnull' => true]);
         $table->addColumn('end_ts', 'bigint', ['notnull' => false]);
+        if ($name === 'worktracker_pauses') {
+            $table->addColumn('rounded_seconds', 'bigint', ['notnull' => true, 'default' => 0]);
+        }
         $table->addColumn('created_at', 'bigint', ['notnull' => true]);
         $table->addColumn('updated_at', 'bigint', ['notnull' => true]);
         $table->setPrimaryKey(['id']);
