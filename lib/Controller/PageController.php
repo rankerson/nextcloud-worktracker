@@ -12,6 +12,10 @@ class PageController extends Controller {
         parent::__construct($appName, $request);
     }
 
+    /**
+     * @NoAdminRequired
+     * @NoCSRFRequired
+     */
     public function index(): TemplateResponse {
         return new TemplateResponse('worktracker', 'main');
     }
