@@ -1,30 +1,30 @@
-#worktracker-app{max-width:1100px;margin:0 auto;padding:24px}
-#worktracker-app h1{margin:0 0 24px}
-.worktracker-section{margin:0 0 28px}
-.worktracker-section h2{font-size:1.25rem;margin:0 0 14px}
-.worktracker-section h3{font-size:1.05rem;margin:0 0 12px}
-.worktracker-metrics{display:flex;flex-wrap:wrap;gap:16px}
-.worktracker-metric{display:flex;flex-direction:column;gap:6px;min-width:180px;padding:16px;border:1px solid var(--color-border);border-radius:var(--border-radius-large)}
-.worktracker-metric span,.worktracker-project-details span,.worktracker-updated{color:var(--color-text-maxcontrast);font-size:.9rem}
-.worktracker-metric strong{font-size:2rem;font-variant-numeric:tabular-nums}
+#worktracker-app{max-width:1100px;margin:0 auto;padding:20px;background:#fff;color:#222;border-radius:8px;box-sizing:border-box}
+#worktracker-app h1{margin:0 0 18px;color:#222}
+.worktracker-section{margin:0 0 20px;color:#222}
+.worktracker-section h2{font-size:1.2rem;margin:0 0 10px;color:#222}
+.worktracker-section h3{font-size:1rem;margin:0 0 8px;color:#222}
+.worktracker-metrics{display:flex;flex-wrap:wrap;gap:10px}
+.worktracker-metric{display:flex;flex-direction:column;gap:4px;min-width:160px;padding:12px;border:1px solid #ddd;border-radius:8px;background:#fff;color:#222}
+.worktracker-metric span,.worktracker-project-details span,.worktracker-updated{color:#555;font-size:.85rem}
+.worktracker-metric strong{font-size:1.45rem;font-variant-numeric:tabular-nums;color:#222}
 .worktracker-controls{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
-.worktracker-button{border:1px solid var(--color-primary-element);border-radius:var(--border-radius);padding:8px 14px;background:var(--color-primary-element);color:var(--color-primary-element-text,#fff);cursor:pointer;font:inherit;font-weight:600}
+.worktracker-button{border:1px solid #1769aa;border-radius:5px;padding:7px 12px;background:#1769aa;color:#fff;cursor:pointer;font:inherit;font-weight:600}
 .worktracker-button:hover:not(:disabled){filter:brightness(1.08)}
 .worktracker-button:focus-visible{outline:2px solid var(--color-primary-element);outline-offset:2px}
 .worktracker-button:disabled{opacity:.5;cursor:not-allowed}
-.worktracker-project-list{border-top:1px solid var(--color-border);margin-top:16px}
-.worktracker-project{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0;border-bottom:1px solid var(--color-border)}
+.worktracker-project-list{border-top:1px solid #ddd;margin-top:10px}
+.worktracker-project{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid #ddd}
 .worktracker-project.active{border-left:3px solid var(--color-primary-element);padding-left:12px}
 .worktracker-project-details{display:flex;flex-direction:column;gap:4px;min-width:0}
-.worktracker-project-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:16px;margin-top:16px;border:1px solid var(--color-border);border-radius:var(--border-radius-large)}
+.worktracker-project-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:12px;margin-top:12px;border:1px solid #ddd;border-radius:8px;background:#fff}
 .worktracker-project-form h3,.worktracker-project-form .worktracker-controls{grid-column:1/-1}
 .worktracker-field{display:flex;flex-direction:column;gap:6px;min-width:0}
-.worktracker-field span{font-size:.9rem;color:var(--color-text-maxcontrast)}
-.worktracker-field input,.worktracker-field textarea{width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--color-border);border-radius:var(--border-radius);background:var(--color-main-background);color:var(--color-main-text);font:inherit}
+.worktracker-field span{font-size:.9rem;color:#555}
+.worktracker-field input,.worktracker-field textarea{width:100%;box-sizing:border-box;padding:8px;border:1px solid #bbb;border-radius:5px;background:#fff;color:#222;font:inherit}
 .worktracker-field textarea{min-height:80px;resize:vertical}
 .worktracker-notice{padding:12px 16px;margin:0 0 18px;border-radius:var(--border-radius);background:var(--color-background-dark)}
 .worktracker-notice.error{color:var(--color-error);border:1px solid var(--color-error)}
-.worktracker-empty,.worktracker-loading{color:var(--color-text-maxcontrast)}
+.worktracker-empty,.worktracker-loading{color:#555}
 .worktracker-updated{margin-top:16px}
 @media(max-width:700px){#worktracker-app{padding:16px}.worktracker-project{align-items:flex-start;flex-direction:column}.worktracker-metric{flex:1 1 100%}.worktracker-project-form{grid-template-columns:1fr}}
 
@@ -32,15 +32,23 @@
 .worktracker-report-filters .worktracker-field{min-width:170px}
 .worktracker-report-content{display:flex;flex-direction:column;gap:14px}
 .worktracker-report-content h3{margin:12px 0 4px}
-.worktracker-report-list{border-top:1px solid var(--color-border)}
-.worktracker-report-row{display:flex;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid var(--color-border)}
+.worktracker-report-list{border-top:1px solid #ddd}
+.worktracker-report-row{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid #ddd;color:#222}
 .worktracker-report-row strong{font-variant-numeric:tabular-nums}
 .worktracker-button{text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
 
-.worktracker-field select{width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--color-border);border-radius:var(--border-radius);background:var(--color-main-background);color:var(--color-main-text);font:inherit}
+.worktracker-field select{width:100%;box-sizing:border-box;padding:8px;border:1px solid #bbb;border-radius:5px;background:#fff;color:#222;font:inherit}
 .worktracker-entry-row{align-items:center}
 .worktracker-entry-details{display:flex;flex-direction:column;gap:4px;min-width:0}
-.worktracker-entry-details span{color:var(--color-text-maxcontrast);font-size:.9rem}
+.worktracker-entry-details span{color:#555;font-size:.85rem}
 .worktracker-entry-row .worktracker-controls{margin-top:0}
 .worktracker-entry-editor h4,.worktracker-entry-editor .worktracker-controls{grid-column:1/-1}
 @media(max-width:700px){.worktracker-entry-row{align-items:flex-start;flex-direction:column}.worktracker-entry-row .worktracker-controls{margin-top:8px}}
+
+.worktracker-dual-time{display:flex;flex-direction:column;gap:2px}
+.worktracker-dual-time small{font-size:.78rem;color:#555;font-weight:400;font-variant-numeric:tabular-nums}
+.worktracker-project-time-row{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid #ddd;color:#222}
+.worktracker-project-time-row strong{font-variant-numeric:tabular-nums;white-space:nowrap}
+#worktracker-app .worktracker-controls{gap:6px;margin-top:10px}
+#worktracker-app .worktracker-button:disabled{opacity:.5}
+@media(max-width:700px){#worktracker-app{padding:12px}.worktracker-metric{flex:1 1 100%}.worktracker-project-form{grid-template-columns:1fr}}

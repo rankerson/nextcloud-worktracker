@@ -79,7 +79,10 @@
             const clock = document.createElement('div');
             clock.className = 'worktracker-clock';
             clock.textContent = formatSeconds(status.work_elapsed_seconds);
-            work.append(heading, clock);
+            const rounded = document.createElement('div');
+            rounded.className = 'worktracker-rounded';
+            rounded.textContent = t(appId, 'Rounded') + ': ' + formatSeconds(status.work_rounded_seconds);
+            work.append(heading, clock, rounded);
             if (status.work_running) {
                 work.append(button(t(appId, 'Stop work'), () => request('work/stop', 'POST'), 'danger'));
                 if (status.pause_running) {
@@ -98,9 +101,17 @@
             projects.forEach(project => {
                 const row = document.createElement('div');
                 row.className = 'worktracker-project';
-                const name = document.createElement('span');
+                const details = document.createElement('div');
+                details.className = 'worktracker-project-details';
+                const name = document.createElement('strong');
                 name.textContent = project.name;
-                row.append(name);
+                const exact = Number((status.project_seconds || {})[project.id] || 0);
+                const roundedSeconds = Number((status.project_rounded_seconds || {})[project.id] || 0);
+                const duration = document.createElement('small');
+                duration.textContent = formatSeconds(exact) + ' / ' + formatSeconds(roundedSeconds);
+                duration.title = t(appId, 'Actual / rounded');
+                details.append(name, duration);
+                row.append(details);
                 if (status.active_project_id === project.id) {
                     row.append(button(t(appId, 'Stop'), () => request('projects/stop', 'POST'), 'danger'));
                 } else {

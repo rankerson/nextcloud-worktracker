@@ -94,16 +94,15 @@ class TimeTrackingService {
         $todayStart = (new \DateTimeImmutable('today', new \DateTimeZone($this->timezone($uid))))->getTimestamp();
         $gross = $this->sumToday('worktracker_work', $uid, $todayStart, $now);
         $pauseSeconds = $this->sumToday('worktracker_pauses', $uid, $todayStart, $now);
-        $workSeconds = max(0, $gross - $pauseSeconds);
         $pauseRounded = $this->sumRoundedPausesToday($uid, $todayStart, $now);
         [$projectSeconds, $projectRounded] = $this->projectTotalsToday($uid, $todayStart, $now);
         return [
             'work_running' => $work !== null,
             'pause_running' => $pause !== null,
             'active_project_id' => $project ? (int)$project['project_id'] : null,
-            'work_elapsed_seconds' => $workSeconds,
-            'work_rounded_seconds' => TimeMath::roundToQuarterHour($workSeconds),
-            'pause_elapsed_seconds' => $pause ? max(0, $now - (int)$pause['start_ts']) : 0,
+            'work_elapsed_seconds' => $gross,
+            'work_rounded_seconds' => TimeMath::roundToQuarterHour($gross),
+            'pause_elapsed_seconds' => $pauseSeconds,
             'pause_rounded_seconds' => $pauseRounded,
             'active_project_elapsed_seconds' => $project ? max(0, $now - (int)$project['start_ts']) : 0,
             'project_seconds' => $projectSeconds,

@@ -14,7 +14,7 @@ class ExportService {
         foreach ($this->entries->list($uid, $from, $to) as $entry) {
             $end = (int)($entry['end_ts'] ?? time());
             $duration = max(0, $end - (int)$entry['start_ts']);
-            $rounded = $entry['type'] === 'pause' ? TimeMath::roundToQuarterHour($duration) : '';
+            $rounded = TimeMath::roundToQuarterHour($duration);
             $rows[] = [
                 date('Y-m-d', (int)$entry['start_ts']),
                 $entry['type'] === 'work' ? 'Arbeitszeit' : ($entry['type'] === 'pause' ? 'Pause' : 'Projekt'),
