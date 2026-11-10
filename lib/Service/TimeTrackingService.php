@@ -91,7 +91,7 @@ class TimeTrackingService {
         $work = $this->getOpen('worktracker_work', $uid);
         $pause = $this->getOpen('worktracker_pauses', $uid);
         $project = $this->getOpen('worktracker_project_times', $uid);
-        $todayStart = (new \\DateTimeImmutable('today', new \\DateTimeZone($this->timezone($uid))))->getTimestamp();
+        $todayStart = (new \DateTimeImmutable('today', new \DateTimeZone($this->timezone($uid))))->getTimestamp();
         $gross = $this->sumToday('worktracker_work', $uid, $todayStart, $now);
         $pauseSeconds = $this->sumToday('worktracker_pauses', $uid, $todayStart, $now);
         $workSeconds = max(0, $gross - $pauseSeconds);
