@@ -287,6 +287,12 @@
                     remove.disabled = false;
                 }
             });
+            if (!entry.end_ts) {
+                edit.disabled = true;
+                remove.disabled = true;
+                edit.title = translate('Stop the running interval before editing it.');
+                remove.title = translate('A running interval cannot be deleted here.');
+            }
             actions.append(edit, remove);
             row.append(details, actions);
             entryList.append(row);
