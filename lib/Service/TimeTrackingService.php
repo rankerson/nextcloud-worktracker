@@ -91,19 +91,67 @@ class TimeTrackingService {
         $work = $this->getOpen('worktracker_work', $uid);
         $pause = $this->getOpen('worktracker_pauses', $uid);
         $project = $this->getOpen('worktracker_project_times', $uid);
-        $todayStart = (new \DateTimeImmutable('today', new \DateTimeZone($this->timezone($uid))))->getTimestamp();
+        $todayStart = (new \\DateTimeImmutable('today', new \\DateTimeZone($this->timezone($uid))))->getTimestamp();
         $gross = $this->sumToday('worktracker_work', $uid, $todayStart, $now);
         $pauseSeconds = $this->sumToday('worktracker_pauses', $uid, $todayStart, $now);
+        $workSeconds = max(0, $gross - $pauseSeconds);
+        $pauseRounded = $this->sumRoundedPausesToday($uid, $todayStart, $now);
+        [$projectSeconds, $projectRounded] = $this->projectTotalsToday($uid, $todayStart, $now);
         return [
             'work_running' => $work !== null,
             'pause_running' => $pause !== null,
             'active_project_id' => $project ? (int)$project['project_id'] : null,
-            'work_elapsed_seconds' => max(0, $gross - $pauseSeconds),
+            'work_elapsed_seconds' => $workSeconds,
+            'work_rounded_seconds' => TimeMath::roundToQuarterHour($workSeconds),
             'pause_elapsed_seconds' => $pause ? max(0, $now - (int)$pause['start_ts']) : 0,
+            'pause_rounded_seconds' => $pauseRounded,
             'active_project_elapsed_seconds' => $project ? max(0, $now - (int)$project['start_ts']) : 0,
+            'project_seconds' => $projectSeconds,
+            'project_rounded_seconds' => $projectRounded,
             'server_time' => $now,
             'timezone' => $this->timezone($uid),
         ];
+    }
+
+    private function sumRoundedPausesToday(string $uid, int $start, int $end): int {
+        $qb = $this->db->getQueryBuilder();
+        $qb->select('start_ts', 'end_ts')->from('worktracker_pauses')
+            ->where($qb->expr()->eq('user_id', $qb->createNamedParameter($uid)))
+            ->andWhere($qb->expr()->lt('start_ts', $qb->createNamedParameter($end)))
+            ->andWhere($qb->expr()->orX($qb->expr()->isNull('end_ts'), $qb->expr()->gt('end_ts', $qb->createNamedParameter($start))));
+        $result = $qb->executeQuery();
+        $total = 0;
+        while ($row = $result->fetch()) {
+            $pauseStart = (int)$row['start_ts'];
+            $pauseEnd = (int)($row['end_ts'] ?? $end);
+            if ($pauseStart >= $start && $pauseStart < $end) {
+                $total += TimeMath::roundToQuarterHour(max(0, $pauseEnd - $pauseStart));
+            }
+        }
+        $result->closeCursor();
+        return $total;
+    }
+
+    private function projectTotalsToday(string $uid, int $start, int $end): array {
+        $qb = $this->db->getQueryBuilder();
+        $qb->select('project_id', 'start_ts', 'end_ts')->from('worktracker_project_times')
+            ->where($qb->expr()->eq('user_id', $qb->createNamedParameter($uid)))
+            ->andWhere($qb->expr()->lt('start_ts', $qb->createNamedParameter($end)))
+            ->andWhere($qb->expr()->orX($qb->expr()->isNull('end_ts'), $qb->expr()->gt('end_ts', $qb->createNamedParameter($start))));
+        $result = $qb->executeQuery();
+        $totals = [];
+        while ($row = $result->fetch()) {
+            $s = max($start, (int)$row['start_ts']);
+            $e = min($end, (int)($row['end_ts'] ?? $end));
+            if ($e > $s) {
+                $id = (string)$row['project_id'];
+                $totals[$id] = ($totals[$id] ?? 0) + ($e - $s);
+            }
+        }
+        $result->closeCursor();
+        $rounded = [];
+        foreach ($totals as $id => $seconds) $rounded[$id] = TimeMath::roundToQuarterHour($seconds);
+        return [$totals, $rounded];
     }
 
     public function listProjects(string $uid, bool $includeExpired = false): array {
