@@ -104,7 +104,9 @@
                 if (status.active_project_id === project.id) {
                     row.append(button(t(appId, 'Stop'), () => request('projects/stop', 'POST'), 'danger'));
                 } else {
-                    row.append(button(t(appId, 'Start'), () => request('projects/' + project.id + '/start', 'POST')));
+                    const start = button(t(appId, 'Start'), () => request('projects/' + project.id + '/start', 'POST'));
+                    start.disabled = !status.work_running;
+                    row.append(start);
                 }
                 target.append(row);
             });

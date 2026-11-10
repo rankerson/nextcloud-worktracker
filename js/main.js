@@ -31,7 +31,7 @@
             try {
                 data = JSON.parse(responseText);
             } catch (error) {
-                const detail = responseText.replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim().slice(0, 240);
+                const detail = responseText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 240);
                 throw new Error('Ungültige Serverantwort (HTTP ' + response.status + ')' + (detail ? ': ' + detail : '.'));
             }
         }
@@ -41,6 +41,250 @@
         }
         if (data === null) throw new Error('Der Server hat eine leere Antwort gesendet.');
         return data;
+    }
+
+    function formatDate(date) {
+        return date.toLocaleDateString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit' });
+    }
+
+    function dateInputValue(date) {
+        const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+        return local.toISOString().slice(0, 10);
+    }
+
+    function reportDuration(entries, type, from, to, now) {
+        return entries.filter(entry => entry.type === type).reduce((sum, entry) => {
+            const start = Math.max(from, Number(entry.start_ts));
+            const end = Math.min(to, Number(entry.end_ts ?? now));
+            return sum + Math.max(0, end - start);
+        }, 0);
+    }
+
+    async function renderReport(container, fromDate, toDate, projects = []) {
+        const from = new Date(fromDate + 'T00:00:00').getTime() / 1000;
+        const to = new Date(toDate + 'T00:00:00').getTime() / 1000 + 86400;
+        if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from) {
+            throw new Error(translate('Please select a valid reporting period.'));
+        }
+
+        const entries = await request('entries?from=' + Math.floor(from) + '&to=' + Math.floor(to));
+        const now = Math.floor(Date.now() / 1000);
+        const work = reportDuration(entries, 'work', from, to, now);
+        const pause = reportDuration(entries, 'pause', from, to, now);
+        const net = Math.max(0, work - pause);
+
+        container.replaceChildren();
+        const totals = document.createElement('div');
+        totals.className = 'worktracker-metrics';
+        [
+            [translate('Gross working time'), work],
+            [translate('Break time'), pause],
+            [translate('Net working time'), net],
+            [translate('Project time'), reportDuration(entries, 'project', from, to, now)],
+        ].forEach(([label, seconds]) => {
+            const metric = document.createElement('div');
+            metric.className = 'worktracker-metric';
+            const caption = document.createElement('span');
+            caption.textContent = label;
+            const value = document.createElement('strong');
+            value.textContent = formatSeconds(seconds);
+            metric.append(caption, value);
+            totals.append(metric);
+        });
+        container.append(totals);
+
+        const byProject = new Map();
+        entries.filter(entry => entry.type === 'project').forEach(entry => {
+            const start = Math.max(from, Number(entry.start_ts));
+            const end = Math.min(to, Number(entry.end_ts ?? now));
+            const seconds = Math.max(0, end - start);
+            const name = entry.project_name || translate('Unknown project');
+            byProject.set(name, (byProject.get(name) || 0) + seconds);
+        });
+        const projectHeading = document.createElement('h3');
+        projectHeading.textContent = translate('Time by project');
+        container.append(projectHeading);
+        if (byProject.size === 0) {
+            const empty = document.createElement('p');
+            empty.className = 'worktracker-empty';
+            empty.textContent = translate('No project time recorded in this period.');
+            container.append(empty);
+        } else {
+            const list = document.createElement('div');
+            list.className = 'worktracker-report-list';
+            [...byProject.entries()].sort((a, b) => b[1] - a[1]).forEach(([name, seconds]) => {
+                const row = document.createElement('div');
+                row.className = 'worktracker-report-row';
+                const project = document.createElement('span');
+                project.textContent = name;
+                const duration = document.createElement('strong');
+                duration.textContent = formatSeconds(seconds);
+                row.append(project, duration);
+                list.append(row);
+            });
+            container.append(list);
+        }
+
+        const exportHeading = document.createElement('h3');
+        exportHeading.textContent = translate('Export');
+        container.append(exportHeading);
+        const exports = document.createElement('div');
+        exports.className = 'worktracker-controls';
+        [
+            ['CSV', 'csv'],
+            ['Excel (.xlsx)', 'xlsx'],
+        ].forEach(([label, format]) => {
+            const link = document.createElement('a');
+            link.className = 'worktracker-button';
+            link.textContent = label;
+            link.href = OC.generateUrl('/apps/' + appId + '/api/export.' + format
+                + '?from=' + Math.floor(from) + '&to=' + Math.floor(to));
+            link.setAttribute('download', 'worktracker.' + format);
+            exports.append(link);
+        });
+        container.append(exports);
+
+        const entriesHeading = document.createElement('h3');
+        entriesHeading.textContent = translate('Recorded entries');
+        container.append(entriesHeading);
+        const entryList = document.createElement('div');
+        entryList.className = 'worktracker-report-list';
+        entries.forEach(entry => {
+            const row = document.createElement('div');
+            row.className = 'worktracker-report-row worktracker-entry-row';
+            const details = document.createElement('div');
+            details.className = 'worktracker-entry-details';
+            const title = document.createElement('strong');
+            const labels = {
+                work: translate('Working time'),
+                pause: translate('Break'),
+                project: translate('Project time'),
+            };
+            title.textContent = (labels[entry.type] || entry.type)
+                + (entry.project_name ? ' · ' + entry.project_name : '');
+            const period = document.createElement('span');
+            period.textContent = new Date(Number(entry.start_ts) * 1000).toLocaleString()
+                + ' – ' + (entry.end_ts ? new Date(Number(entry.end_ts) * 1000).toLocaleString() : translate('Running'));
+            details.append(title, period);
+            const actions = document.createElement('div');
+            actions.className = 'worktracker-controls';
+            const edit = document.createElement('button');
+            edit.type = 'button';
+            edit.className = 'worktracker-button';
+            edit.textContent = translate('Edit');
+            edit.addEventListener('click', () => {
+                const editor = document.createElement('form');
+                editor.className = 'worktracker-project-form worktracker-entry-editor';
+                const heading = document.createElement('h4');
+                heading.textContent = translate('Edit time entry');
+                editor.append(heading);
+
+                const localValue = timestamp => {
+                    const date = new Date(Number(timestamp) * 1000);
+                    return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+                };
+                const addInput = (labelText, name, type, value) => {
+                    const wrapper = document.createElement('label');
+                    wrapper.className = 'worktracker-field';
+                    const caption = document.createElement('span');
+                    caption.textContent = labelText;
+                    const input = document.createElement('input');
+                    input.type = type;
+                    input.name = name;
+                    input.value = value;
+                    input.required = true;
+                    wrapper.append(caption, input);
+                    editor.append(wrapper);
+                    return input;
+                };
+                const start = addInput(translate('Start'), 'start', 'datetime-local', localValue(entry.start_ts));
+                const end = addInput(translate('End'), 'end', 'datetime-local', localValue(entry.end_ts || now));
+                if (entry.type === 'project') {
+                    const wrapper = document.createElement('label');
+                    wrapper.className = 'worktracker-field';
+                    const caption = document.createElement('span');
+                    caption.textContent = translate('Project');
+                    const projectInput = document.createElement('select');
+                    projectInput.name = 'project_id';
+                    projects.forEach(project => {
+                        const option = document.createElement('option');
+                        option.value = project.id;
+                        option.textContent = project.name;
+                        projectInput.append(option);
+                    });
+                    projectInput.value = String(entry.project_id);
+                    wrapper.append(caption, projectInput);
+                    editor.append(wrapper);
+                }
+                const buttons = document.createElement('div');
+                buttons.className = 'worktracker-controls';
+                const save = document.createElement('button');
+                save.type = 'submit';
+                save.className = 'worktracker-button';
+                save.textContent = translate('Save');
+                const cancel = document.createElement('button');
+                cancel.type = 'button';
+                cancel.className = 'worktracker-button';
+                cancel.textContent = translate('Cancel');
+                cancel.addEventListener('click', () => editor.remove());
+                buttons.append(save, cancel);
+                editor.append(buttons);
+                row.after(editor);
+                edit.disabled = true;
+
+                editor.addEventListener('submit', async event => {
+                    event.preventDefault();
+                    save.disabled = true;
+                    try {
+                        const startTs = Math.floor(new Date(start.value).getTime() / 1000);
+                        const endTs = Math.floor(new Date(end.value).getTime() / 1000);
+                        if (!Number.isFinite(startTs) || !Number.isFinite(endTs) || endTs <= startTs) {
+                            throw new Error(translate('End must be after start.'));
+                        }
+                        const payload = { start_ts: startTs, end_ts: endTs };
+                        if (entry.type === 'project') {
+                            payload.project_id = Number(editor.querySelector('[name="project_id"]').value);
+                        }
+                        await request('entries/' + encodeURIComponent(entry.type) + '/' + encodeURIComponent(entry.id), 'PUT', payload);
+                        await renderReport(container, fromDate, toDate, projects);
+                    } catch (error) {
+                        showMessage(error.message || translate('Could not update entry'), true);
+                        save.disabled = false;
+                    }
+                });
+            });
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.className = 'worktracker-button';
+            remove.textContent = translate('Delete');
+            remove.addEventListener('click', async () => {
+                if (!window.confirm(translate('Delete this time entry permanently?'))) return;
+                remove.disabled = true;
+                try {
+                    await request('entries/' + encodeURIComponent(entry.type) + '/' + encodeURIComponent(entry.id), 'DELETE');
+                    await renderReport(container, fromDate, toDate, projects);
+                } catch (error) {
+                    showMessage(error.message || translate('Could not delete entry'), true);
+                    remove.disabled = false;
+                }
+            });
+            if (!entry.end_ts) {
+                edit.disabled = true;
+                remove.disabled = true;
+                edit.title = translate('Stop the running interval before editing it.');
+                remove.title = translate('A running interval cannot be deleted here.');
+            }
+            actions.append(edit, remove);
+            row.append(details, actions);
+            entryList.append(row);
+        });
+        if (entries.length === 0) {
+            const empty = document.createElement('p');
+            empty.className = 'worktracker-empty';
+            empty.textContent = translate('No entries in this period.');
+            entryList.append(empty);
+        }
+        container.append(entryList);
     }
 
     function formatSeconds(value) {
@@ -60,8 +304,8 @@
             button.disabled = true;
             clearMessage();
             try {
-                await action();
-                await render();
+                const shouldRender = await action();
+                if (shouldRender !== false) await render();
             } catch (error) {
                 showMessage(error.message || translate('Request failed'), true);
             } finally {
@@ -94,6 +338,71 @@
         heading.textContent = title;
         element.append(heading);
         return element;
+    }
+
+    function field(form, labelText, name, type = 'text', value = '') {
+        const wrapper = document.createElement('label');
+        wrapper.className = 'worktracker-field';
+        const label = document.createElement('span');
+        label.textContent = labelText;
+        const input = type === 'textarea'
+            ? document.createElement('textarea')
+            : document.createElement('input');
+        if (type !== 'textarea') input.type = type;
+        input.name = name;
+        input.value = value ?? '';
+        if (name === 'name') input.required = true;
+        wrapper.append(label, input);
+        form.append(wrapper);
+        return input;
+    }
+
+    function projectForm(project = null) {
+        const form = document.createElement('form');
+        form.className = 'worktracker-project-form';
+        const heading = document.createElement('h3');
+        heading.textContent = project ? translate('Edit project') : translate('New project');
+        form.append(heading);
+
+        field(form, translate('Project name'), 'name', 'text', project?.name || '');
+        field(form, translate('Code'), 'code', 'text', project?.code || '');
+        field(form, translate('WBS'), 'wbs', 'text', project?.wbs || '');
+        field(form, translate('Description'), 'description', 'textarea', project?.description || '');
+        field(form, translate('Valid from'), 'valid_from', 'date', project?.valid_from || '');
+        field(form, translate('Valid until'), 'valid_until', 'date', project?.valid_until || '');
+
+        const actions = document.createElement('div');
+        actions.className = 'worktracker-controls';
+        const save = document.createElement('button');
+        save.type = 'submit';
+        save.className = 'worktracker-button';
+        save.textContent = translate('Save project');
+        const cancel = document.createElement('button');
+        cancel.type = 'button';
+        cancel.className = 'worktracker-button';
+        cancel.textContent = translate('Cancel');
+        cancel.addEventListener('click', () => render());
+        actions.append(save, cancel);
+        form.append(actions);
+
+        form.addEventListener('submit', async event => {
+            event.preventDefault();
+            save.disabled = true;
+            clearMessage();
+            const payload = Object.fromEntries(new FormData(form).entries());
+            try {
+                if (project) {
+                    await request('projects/' + encodeURIComponent(project.id), 'PUT', payload);
+                } else {
+                    await request('projects', 'POST', payload);
+                }
+                await render();
+            } catch (error) {
+                showMessage(error.message || translate('Could not save project'), true);
+                save.disabled = false;
+            }
+        });
+        return form;
     }
 
     async function render() {
@@ -137,19 +446,26 @@
             const controls = document.createElement('div');
             controls.className = 'worktracker-controls';
             if (status.work_running) {
-                controls.append(makeButton(translate('Stop work'), () => request('work/stop', 'POST'), 'danger'));
+                controls.append(makeButton(translate('Stop work'), () => request('work/stop', 'POST')));
                 if (status.pause_running) {
                     controls.append(makeButton(translate('End pause'), () => request('pause/stop', 'POST')));
                 } else {
                     controls.append(makeButton(translate('Start pause'), () => request('pause/start', 'POST')));
                 }
             } else {
-                controls.append(makeButton(translate('Start work'), () => request('work/start', 'POST'), 'primary'));
+                controls.append(makeButton(translate('Start work'), () => request('work/start', 'POST')));
             }
             overview.append(controls);
             root.append(overview);
 
             const projectSection = section(translate('Projects'));
+            const addProject = makeButton(translate('New project'), () => {
+                projectSection.append(projectForm());
+                addProject.disabled = true;
+                return false;
+            });
+            projectSection.append(addProject);
+
             if (!Array.isArray(projects) || projects.length === 0) {
                 const empty = document.createElement('p');
                 empty.className = 'worktracker-empty';
@@ -171,21 +487,84 @@
                         code.textContent = project.code;
                         details.append(code);
                     }
+                    if (project.description) {
+                        const description = document.createElement('span');
+                        description.textContent = project.description;
+                        details.append(description);
+                    }
                     row.append(details);
+
+                    const actions = document.createElement('div');
+                    actions.className = 'worktracker-controls';
                     const active = Number(status.active_project_id) === Number(project.id);
                     if (active) {
-                        row.classList.add('active');
-                        row.append(makeButton(translate('Stop project'), () => request('projects/stop', 'POST'), 'danger'));
+                        actions.append(makeButton(translate('Stop project'), () => request('projects/stop', 'POST')));
                     } else {
                         const start = makeButton(translate('Start'), () => request('projects/' + encodeURIComponent(project.id) + '/start', 'POST'));
                         start.disabled = !status.work_running;
-                        row.append(start);
+                        actions.append(start);
                     }
+
+                    if (project.owner_uid === OC.currentUser) {
+                        actions.append(makeButton(translate('Edit'), () => {
+                            projectSection.append(projectForm(project));
+                            addProject.disabled = true;
+                            return false;
+                        }));
+                        actions.append(makeButton(translate('Archive'), async () => {
+                            if (window.confirm(translate('Archive this project? Historical time entries will be kept.'))) {
+                                await request('projects/' + encodeURIComponent(project.id), 'DELETE');
+                            }
+                        }));
+                    }
+                    row.append(actions);
                     list.append(row);
                 });
                 projectSection.append(list);
             }
             root.append(projectSection);
+
+            const reportSection = section(translate('Reporting & export'));
+            const reportFilters = document.createElement('form');
+            reportFilters.className = 'worktracker-report-filters';
+            const fromLabel = document.createElement('label');
+            fromLabel.className = 'worktracker-field';
+            const fromCaption = document.createElement('span');
+            fromCaption.textContent = translate('From');
+            const fromInput = document.createElement('input');
+            fromInput.type = 'date';
+            fromInput.value = dateInputValue(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+            fromLabel.append(fromCaption, fromInput);
+            const toLabel = document.createElement('label');
+            toLabel.className = 'worktracker-field';
+            const toCaption = document.createElement('span');
+            toCaption.textContent = translate('To');
+            const toInput = document.createElement('input');
+            toInput.type = 'date';
+            toInput.value = dateInputValue(new Date());
+            toLabel.append(toCaption, toInput);
+            const showReport = document.createElement('button');
+            showReport.type = 'submit';
+            showReport.className = 'worktracker-button';
+            showReport.textContent = translate('Run report');
+            reportFilters.append(fromLabel, toLabel, showReport);
+            reportSection.append(reportFilters);
+            const reportContent = document.createElement('div');
+            reportContent.className = 'worktracker-report-content';
+            reportSection.append(reportContent);
+            reportFilters.addEventListener('submit', async event => {
+                event.preventDefault();
+                showReport.disabled = true;
+                try {
+                    await renderReport(reportContent, fromInput.value, toInput.value, projects);
+                } catch (error) {
+                    showMessage(error.message || translate('Could not load report'), true);
+                } finally {
+                    showReport.disabled = false;
+                }
+            });
+            root.append(reportSection);
+            await renderReport(reportContent, fromInput.value, toInput.value);
 
             const updated = document.createElement('p');
             updated.className = 'worktracker-updated';

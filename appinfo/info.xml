@@ -4,7 +4,7 @@
   <name>Work Tracker</name>
   <summary>Arbeitszeit, Pausen und Projektzeiten erfassen</summary>
   <description>Mehrbenutzerfähige Arbeitszeit- und Projektzeiterfassung mit Dashboard-Widget, Auswertungen und Export.</description>
-  <version>1.0.1</version>
+  <version>1.0.2</version>
   <licence>agpl</licence>
   <author>rankerson</author>
   <namespace>WorkTracker</namespace>
@@ -19,7 +19,8 @@
   <navigations>
     <navigation>
       <name>Work Tracker</name>
-      <route>page.index</route>
+      <route>worktracker.page.index</route>
+      <order>50</order>
       <icon>app.svg</icon>
       <type>link</type>
     </navigation>
