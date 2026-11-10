@@ -17,6 +17,8 @@ jobs:
           php-version: '8.2'
           coverage: none
           tools: composer:v2
+      - name: Shell syntax check
+        run: bash -n scripts/install-update.sh
       - name: PHP syntax check
         run: |
           find . -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
