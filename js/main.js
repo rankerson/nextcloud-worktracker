@@ -60,8 +60,8 @@
             button.disabled = true;
             clearMessage();
             try {
-                await action();
-                await render();
+                const shouldRender = await action();
+                if (shouldRender !== false) await render();
             } catch (error) {
                 showMessage(error.message || translate('Request failed'), true);
             } finally {
@@ -218,6 +218,7 @@
             const addProject = makeButton(translate('New project'), () => {
                 projectSection.append(projectForm());
                 addProject.disabled = true;
+                return false;
             });
             projectSection.append(addProject);
 
@@ -264,6 +265,7 @@
                         actions.append(makeButton(translate('Edit'), () => {
                             projectSection.append(projectForm(project));
                             addProject.disabled = true;
+                            return false;
                         }));
                         actions.append(makeButton(translate('Archive'), async () => {
                             if (window.confirm(translate('Archive this project? Historical time entries will be kept.'))) {
