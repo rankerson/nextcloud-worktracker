@@ -43,6 +43,108 @@
         return data;
     }
 
+    function formatDate(date) {
+        return date.toLocaleDateString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit' });
+    }
+
+    function dateInputValue(date) {
+        const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+        return local.toISOString().slice(0, 10);
+    }
+
+    function reportDuration(entries, type, from, to, now) {
+        return entries.filter(entry => entry.type === type).reduce((sum, entry) => {
+            const start = Math.max(from, Number(entry.start_ts));
+            const end = Math.min(to, Number(entry.end_ts ?? now));
+            return sum + Math.max(0, end - start);
+        }, 0);
+    }
+
+    async function renderReport(container, fromDate, toDate) {
+        const from = new Date(fromDate + 'T00:00:00').getTime() / 1000;
+        const to = new Date(toDate + 'T00:00:00').getTime() / 1000 + 86400;
+        if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from) {
+            throw new Error(translate('Please select a valid reporting period.'));
+        }
+
+        const entries = await request('entries?from=' + Math.floor(from) + '&to=' + Math.floor(to));
+        const now = Math.floor(Date.now() / 1000);
+        const work = reportDuration(entries, 'work', from, to, now);
+        const pause = reportDuration(entries, 'pause', from, to, now);
+        const net = Math.max(0, work - pause);
+
+        container.replaceChildren();
+        const totals = document.createElement('div');
+        totals.className = 'worktracker-metrics';
+        [
+            [translate('Gross working time'), work],
+            [translate('Break time'), pause],
+            [translate('Net working time'), net],
+            [translate('Project time'), reportDuration(entries, 'project', from, to, now)],
+        ].forEach(([label, seconds]) => {
+            const metric = document.createElement('div');
+            metric.className = 'worktracker-metric';
+            const caption = document.createElement('span');
+            caption.textContent = label;
+            const value = document.createElement('strong');
+            value.textContent = formatSeconds(seconds);
+            metric.append(caption, value);
+            totals.append(metric);
+        });
+        container.append(totals);
+
+        const byProject = new Map();
+        entries.filter(entry => entry.type === 'project').forEach(entry => {
+            const start = Math.max(from, Number(entry.start_ts));
+            const end = Math.min(to, Number(entry.end_ts ?? now));
+            const seconds = Math.max(0, end - start);
+            const name = entry.project_name || translate('Unknown project');
+            byProject.set(name, (byProject.get(name) || 0) + seconds);
+        });
+        const projectHeading = document.createElement('h3');
+        projectHeading.textContent = translate('Time by project');
+        container.append(projectHeading);
+        if (byProject.size === 0) {
+            const empty = document.createElement('p');
+            empty.className = 'worktracker-empty';
+            empty.textContent = translate('No project time recorded in this period.');
+            container.append(empty);
+        } else {
+            const list = document.createElement('div');
+            list.className = 'worktracker-report-list';
+            [...byProject.entries()].sort((a, b) => b[1] - a[1]).forEach(([name, seconds]) => {
+                const row = document.createElement('div');
+                row.className = 'worktracker-report-row';
+                const project = document.createElement('span');
+                project.textContent = name;
+                const duration = document.createElement('strong');
+                duration.textContent = formatSeconds(seconds);
+                row.append(project, duration);
+                list.append(row);
+            });
+            container.append(list);
+        }
+
+        const exportHeading = document.createElement('h3');
+        exportHeading.textContent = translate('Export');
+        container.append(exportHeading);
+        const exports = document.createElement('div');
+        exports.className = 'worktracker-controls';
+        [
+            ['CSV', 'csv'],
+            ['Excel (.xlsx)', 'xlsx'],
+        ].forEach(([label, format]) => {
+            const link = document.createElement('a');
+            link.className = 'worktracker-button';
+            link.textContent = label;
+            link.href = OC.generateUrl('/apps/' + appId + '/api/export.' + format
+                + '?from=' + Math.floor(from) + '&to=' + Math.floor(to));
+            link.setAttribute('download', 'worktracker.' + format);
+            exports.append(link);
+        });
+        container.append(exports);
+    }
+
     function formatSeconds(value) {
         const seconds = Math.max(0, Number(value) || 0);
         const hours = Math.floor(seconds / 3600);
@@ -279,6 +381,48 @@
                 projectSection.append(list);
             }
             root.append(projectSection);
+
+            const reportSection = section(translate('Reporting & export'));
+            const reportFilters = document.createElement('form');
+            reportFilters.className = 'worktracker-report-filters';
+            const fromLabel = document.createElement('label');
+            fromLabel.className = 'worktracker-field';
+            const fromCaption = document.createElement('span');
+            fromCaption.textContent = translate('From');
+            const fromInput = document.createElement('input');
+            fromInput.type = 'date';
+            fromInput.value = dateInputValue(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+            fromLabel.append(fromCaption, fromInput);
+            const toLabel = document.createElement('label');
+            toLabel.className = 'worktracker-field';
+            const toCaption = document.createElement('span');
+            toCaption.textContent = translate('To');
+            const toInput = document.createElement('input');
+            toInput.type = 'date';
+            toInput.value = dateInputValue(new Date());
+            toLabel.append(toCaption, toInput);
+            const showReport = document.createElement('button');
+            showReport.type = 'submit';
+            showReport.className = 'worktracker-button';
+            showReport.textContent = translate('Run report');
+            reportFilters.append(fromLabel, toLabel, showReport);
+            reportSection.append(reportFilters);
+            const reportContent = document.createElement('div');
+            reportContent.className = 'worktracker-report-content';
+            reportSection.append(reportContent);
+            reportFilters.addEventListener('submit', async event => {
+                event.preventDefault();
+                showReport.disabled = true;
+                try {
+                    await renderReport(reportContent, fromInput.value, toInput.value);
+                } catch (error) {
+                    showMessage(error.message || translate('Could not load report'), true);
+                } finally {
+                    showReport.disabled = false;
+                }
+            });
+            root.append(reportSection);
+            await renderReport(reportContent, fromInput.value, toInput.value);
 
             const updated = document.createElement('p');
             updated.className = 'worktracker-updated';
