@@ -60,6 +60,28 @@
         }, 0);
     }
 
+    function roundQuarterHour(seconds) {
+        return seconds <= 0 ? 0 : Math.floor((seconds + 450) / 900) * 900;
+    }
+
+    function roundEntriesByDay(entries, type, from, to, now, groupByProject = false) {
+        const buckets = new Map();
+        entries.filter(entry => entry.type === type).forEach(entry => {
+            let cursor = Math.max(from, Number(entry.start_ts));
+            const end = Math.min(to, Number(entry.end_ts ?? now));
+            while (cursor < end) {
+                const date = new Date(cursor * 1000);
+                const nextDay = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1).getTime() / 1000;
+                const partEnd = Math.min(end, nextDay);
+                const day = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+                const key = (groupByProject ? String(entry.project_id) + '|' : '') + day;
+                buckets.set(key, (buckets.get(key) || 0) + partEnd - cursor);
+                cursor = partEnd;
+            }
+        });
+        return [...buckets.values()].reduce((sum, seconds) => sum + roundQuarterHour(seconds), 0);
+    }
+
     async function renderReport(container, fromDate, toDate, projects = []) {
         const from = new Date(fromDate + 'T00:00:00').getTime() / 1000;
         const to = new Date(toDate + 'T00:00:00').getTime() / 1000 + 86400;
@@ -71,35 +93,49 @@
         const now = Math.floor(Date.now() / 1000);
         const work = reportDuration(entries, 'work', from, to, now);
         const pause = reportDuration(entries, 'pause', from, to, now);
-        const net = Math.max(0, work - pause);
+        const project = reportDuration(entries, 'project', from, to, now);
+        const workRounded = roundEntriesByDay(entries, 'work', from, to, now);
+        const pauseRounded = entries.filter(entry => entry.type === 'pause').reduce((sum, entry) => {
+            const start = Math.max(from, Number(entry.start_ts));
+            const end = Math.min(to, Number(entry.end_ts ?? now));
+            return sum + (end > start ? roundQuarterHour(end - start) : 0);
+        }, 0);
+        const projectRounded = roundEntriesByDay(entries, 'project', from, to, now, true);
 
         container.replaceChildren();
         const totals = document.createElement('div');
         totals.className = 'worktracker-metrics';
         [
-            [translate('Gross working time'), work],
-            [translate('Break time'), pause],
-            [translate('Net working time'), net],
-            [translate('Project time'), reportDuration(entries, 'project', from, to, now)],
-        ].forEach(([label, seconds]) => {
+            [translate('Gross working time'), work, workRounded],
+            [translate('Break time'), pause, pauseRounded],
+            [translate('Project time'), project, projectRounded],
+        ].forEach(([label, exact, rounded]) => {
             const metric = document.createElement('div');
             metric.className = 'worktracker-metric';
             const caption = document.createElement('span');
             caption.textContent = label;
             const value = document.createElement('strong');
-            value.textContent = formatSeconds(seconds);
-            metric.append(caption, value);
+            value.textContent = formatSeconds(exact);
+            const roundedValue = document.createElement('small');
+            roundedValue.textContent = translate('Rounded') + ': ' + formatSeconds(rounded);
+            roundedValue.className = 'worktracker-rounded';
+            metric.append(caption, value, roundedValue);
             totals.append(metric);
         });
         container.append(totals);
 
         const byProject = new Map();
+        const byProjectRoundedDaily = new Map();
         entries.filter(entry => entry.type === 'project').forEach(entry => {
             const start = Math.max(from, Number(entry.start_ts));
             const end = Math.min(to, Number(entry.end_ts ?? now));
             const seconds = Math.max(0, end - start);
             const name = entry.project_name || translate('Unknown project');
             byProject.set(name, (byProject.get(name) || 0) + seconds);
+            const date = new Date(start * 1000);
+            const day = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+            const key = name + '|' + day;
+            byProjectRoundedDaily.set(key, (byProjectRoundedDaily.get(key) || 0) + seconds);
         });
         const projectHeading = document.createElement('h3');
         projectHeading.textContent = translate('Time by project');
@@ -117,8 +153,16 @@
                 row.className = 'worktracker-report-row';
                 const project = document.createElement('span');
                 project.textContent = name;
-                const duration = document.createElement('strong');
-                duration.textContent = formatSeconds(seconds);
+                const duration = document.createElement('div');
+                duration.className = 'worktracker-dual-time';
+                const exactValue = document.createElement('strong');
+                exactValue.textContent = formatSeconds(seconds);
+                const roundedValue = document.createElement('small');
+                const rounded = [...byProjectRoundedDaily.entries()]
+                    .filter(([key]) => key.startsWith(name + '|'))
+                    .reduce((sum, [, value]) => sum + roundQuarterHour(value), 0);
+                roundedValue.textContent = translate('Rounded') + ': ' + formatSeconds(rounded);
+                duration.append(exactValue, roundedValue);
                 row.append(project, duration);
                 list.append(row);
             });
@@ -427,10 +471,13 @@
             const workMetric = document.createElement('div');
             workMetric.className = 'worktracker-metric';
             const workLabel = document.createElement('span');
-            workLabel.textContent = translate('Net working time');
+            workLabel.textContent = translate('Gross working time');
             const workValue = document.createElement('strong');
             workValue.textContent = formatSeconds(status.work_elapsed_seconds);
-            workMetric.append(workLabel, workValue);
+            const workRounded = document.createElement('small');
+            workRounded.className = 'worktracker-rounded';
+            workRounded.textContent = translate('Rounded') + ': ' + formatSeconds(status.work_rounded_seconds);
+            workMetric.append(workLabel, workValue, workRounded);
             metrics.append(workMetric);
 
             const pauseMetric = document.createElement('div');
@@ -439,7 +486,10 @@
             pauseLabel.textContent = translate('Break time');
             const pauseValue = document.createElement('strong');
             pauseValue.textContent = formatSeconds(status.pause_elapsed_seconds);
-            pauseMetric.append(pauseLabel, pauseValue);
+            const pauseRounded = document.createElement('small');
+            pauseRounded.className = 'worktracker-rounded';
+            pauseRounded.textContent = translate('Rounded') + ': ' + formatSeconds(status.pause_rounded_seconds);
+            pauseMetric.append(pauseLabel, pauseValue, pauseRounded);
             metrics.append(pauseMetric);
             overview.append(metrics);
 
@@ -458,7 +508,33 @@
             overview.append(controls);
             root.append(overview);
 
-            const projectSection = section(translate('Projects'));
+            const projectTimeSection = section(translate('Project times today'));
+            const projectTimeList = document.createElement('div');
+            projectTimeList.className = 'worktracker-report-list';
+            const projectTimeTotals = status.project_seconds || {};
+            const projectTimeRounded = status.project_rounded_seconds || {};
+            const projectById = new Map(projects.map(project => [String(project.id), project.name]));
+            Object.keys(projectTimeTotals).sort((a, b) => Number(projectTimeTotals[b]) - Number(projectTimeTotals[a])).forEach(id => {
+                const row = document.createElement('div');
+                row.className = 'worktracker-project-time-row';
+                const name = document.createElement('span');
+                name.textContent = projectById.get(String(id)) || (translate('Project') + ' #' + id);
+                const duration = document.createElement('strong');
+                duration.textContent = formatSeconds(projectTimeTotals[id]) + ' / ' + formatSeconds(projectTimeRounded[id] || 0);
+                duration.title = translate('Actual / rounded');
+                row.append(name, duration);
+                projectTimeList.append(row);
+            });
+            if (projectTimeList.children.length === 0) {
+                const empty = document.createElement('p');
+                empty.className = 'worktracker-empty';
+                empty.textContent = translate('No project time recorded today.');
+                projectTimeList.append(empty);
+            }
+            projectTimeSection.append(projectTimeList);
+            root.append(projectTimeSection);
+
+            const projectSection = section(translate('Project management'));
             const addProject = makeButton(translate('New project'), () => {
                 projectSection.append(projectForm());
                 addProject.disabled = true;
