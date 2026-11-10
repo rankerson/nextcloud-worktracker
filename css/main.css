@@ -27,3 +27,12 @@
 .worktracker-empty,.worktracker-loading{color:var(--color-text-maxcontrast)}
 .worktracker-updated{margin-top:16px}
 @media(max-width:700px){#worktracker-app{padding:16px}.worktracker-project{align-items:flex-start;flex-direction:column}.worktracker-metric{flex:1 1 100%}.worktracker-project-form{grid-template-columns:1fr}}
+
+.worktracker-report-filters{display:flex;align-items:flex-end;flex-wrap:wrap;gap:12px;margin:12px 0 20px}
+.worktracker-report-filters .worktracker-field{min-width:170px}
+.worktracker-report-content{display:flex;flex-direction:column;gap:14px}
+.worktracker-report-content h3{margin:12px 0 4px}
+.worktracker-report-list{border-top:1px solid var(--color-border)}
+.worktracker-report-row{display:flex;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid var(--color-border)}
+.worktracker-report-row strong{font-variant-numeric:tabular-nums}
+.worktracker-button{text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
