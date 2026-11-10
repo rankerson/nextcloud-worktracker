@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<info>
+  <id>worktracker</id>
+  <name>Work Tracker</name>
+  <summary>Arbeitszeit, Pausen und Projektzeiten erfassen</summary>
+  <description>Mehrbenutzerfähige Arbeitszeit- und Projektzeiterfassung mit Dashboard-Widget, Auswertungen und Export.</description>
+  <version>1.0.0</version>
+  <licence>agpl</licence>
+  <author>rankerson</author>
+  <namespace>WorkTracker</namespace>
+  <category>organization</category>
+  <website>https://github.com/rankerson/nextcloud-worktracker</website>
+  <bugs>https://github.com/rankerson/nextcloud-worktracker/issues</bugs>
+  <repository type="git">https://github.com/rankerson/nextcloud-worktracker</repository>
+  <dependencies>
+    <nextcloud min-version="35" max-version="999"/>
+    <php min-version="8.1"/>
+  </dependencies>
+  <background-jobs>
+    <job>OCA\WorkTracker\BackgroundJob\DailySummaryJob</job>
+  </background-jobs>
+</info>
