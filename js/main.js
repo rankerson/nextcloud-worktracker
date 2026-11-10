@@ -199,24 +199,6 @@
                 };
                 const start = addInput(translate('Start'), 'start', 'datetime-local', localValue(entry.start_ts));
                 const end = addInput(translate('End'), 'end', 'datetime-local', localValue(entry.end_ts || now));
-                let typeInput = null;
-                if (entry.type === 'work' || entry.type === 'pause') {
-                    const wrapper = document.createElement('label');
-                    wrapper.className = 'worktracker-field';
-                    const caption = document.createElement('span');
-                    caption.textContent = translate('Entry type');
-                    typeInput = document.createElement('select');
-                    typeInput.name = 'type';
-                    [['work', translate('Working time')], ['pause', translate('Break')]].forEach(([value, label]) => {
-                        const option = document.createElement('option');
-                        option.value = value;
-                        option.textContent = label;
-                        typeInput.append(option);
-                    });
-                    typeInput.value = entry.type;
-                    wrapper.append(caption, typeInput);
-                    editor.append(wrapper);
-                }
                 if (entry.type === 'project') {
                     const wrapper = document.createElement('label');
                     wrapper.className = 'worktracker-field';
@@ -260,7 +242,6 @@
                             throw new Error(translate('End must be after start.'));
                         }
                         const payload = { start_ts: startTs, end_ts: endTs };
-                        if (typeInput) payload.type = typeInput.value;
                         if (entry.type === 'project') {
                             payload.project_id = Number(editor.querySelector('[name="project_id"]').value);
                         }
