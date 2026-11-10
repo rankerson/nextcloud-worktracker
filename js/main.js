@@ -178,7 +178,7 @@
                         row.append(makeButton(translate('Stop project'), () => request('projects/stop', 'POST'), 'danger'));
                     } else {
                         const start = makeButton(translate('Start'), () => request('projects/' + encodeURIComponent(project.id) + '/start', 'POST'));
-                        start.disabled = !status.work_running || status.pause_running;
+                        start.disabled = !status.work_running;
                         row.append(start);
                     }
                     list.append(row);
