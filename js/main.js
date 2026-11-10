@@ -216,10 +216,6 @@
             heading.textContent = translate('Add a missed time interval');
             editor.append(heading);
 
-            const localValue = timestamp => {
-                const date = new Date(Number(timestamp) * 1000);
-                return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-            };
             const addField = (labelText, name, type, value) => {
                 const wrapper = document.createElement('label');
                 wrapper.className = 'worktracker-field';
