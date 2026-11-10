@@ -18,8 +18,20 @@
         }
         return fetch(OC.generateUrl('/apps/' + appId + '/api/' + path), options)
             .then(async response => {
-                const data = await response.json();
-                if (!response.ok) throw new Error(data.error || response.statusText);
+                const text = await response.text();
+                let data = null;
+                if (text !== '') {
+                    try {
+                        data = JSON.parse(text);
+                    } catch (error) {
+                        const detail = text.replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim().slice(0, 240);
+                        throw new Error('Ungültige Serverantwort (HTTP ' + response.status + ')' + (detail ? ': ' + detail : '.'));
+                    }
+                }
+                if (!response.ok) {
+                    throw new Error((data && data.error) || ('HTTP ' + response.status + ': ' + response.statusText));
+                }
+                if (data === null) throw new Error('Der Server hat eine leere Antwort gesendet.');
                 return data;
             });
     }

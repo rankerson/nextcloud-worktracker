@@ -28,7 +28,11 @@ class ApiController extends Controller {
 
     /** @NoAdminRequired */
     public function status(): JSONResponse {
-        return new JSONResponse($this->timeService->getStatus($this->uid()));
+        try {
+            return new JSONResponse($this->timeService->getStatus($this->uid()));
+        } catch (\Throwable $e) {
+            return new JSONResponse(['error' => 'Der Status konnte nicht geladen werden.'], 500);
+        }
     }
 
     /** @NoAdminRequired */
@@ -63,7 +67,11 @@ class ApiController extends Controller {
 
     /** @NoAdminRequired */
     public function listProjects(): JSONResponse {
-        return new JSONResponse($this->timeService->listProjects($this->uid(), true));
+        try {
+            return new JSONResponse($this->timeService->listProjects($this->uid(), true));
+        } catch (\Throwable $e) {
+            return new JSONResponse(['error' => 'Die Projekte konnten nicht geladen werden.'], 500);
+        }
     }
 
     /** @NoAdminRequired */
