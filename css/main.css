@@ -53,17 +53,22 @@
 #worktracker-app .worktracker-button:disabled{opacity:.5}
 @media(max-width:700px){#worktracker-app{padding:12px}.worktracker-metric{flex:1 1 100%}.worktracker-project-form{grid-template-columns:1fr}}
 
-/* Let Nextcloud's app content area scroll when this page is taller than the viewport. */
-#app-content:has(#worktracker-app) {
+/* Use the same Nextcloud content-container scrolling pattern as Daytracker. */
+body:has(#worktracker-app) #content,
+body:has(#worktracker-app) #content-vue,
+body:has(#worktracker-app) #app-content {
     min-height: 0;
     overflow-y: auto !important;
-    overflow-x: hidden !important;
 }
-#worktracker-app.worktracker-app-page {
-    height: auto;
+
+body:has(#worktracker-app) #app-content-vue {
     min-height: 100%;
     overflow: visible;
-    box-sizing: border-box;
+}
+
+#worktracker-app,
+#worktracker-app .worktracker-section {
+    max-height: none;
 }
 .worktracker-entries-header {
     display: flex;
