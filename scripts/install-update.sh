@@ -74,7 +74,11 @@ docker exec "$CONTAINER" rm -rf "$APP_DIR"
 docker exec "$CONTAINER" mkdir -p "$APP_DIR"
 docker exec "$CONTAINER" tar -xzf "$CONTAINER_ARCHIVE" -C "$APP_DIR"
 docker exec "$CONTAINER" rm -f "$CONTAINER_ARCHIVE"
-docker exec -u www-data "$CONTAINER" chown -R www-data:www-data "$APP_DIR"
+# The app directory may be a Docker bind mount whose ownership cannot be
+# changed from inside the container. The extracted Git permissions (dirs 755,
+# files 644) are readable by www-data; verify that instead of running chown.
+docker exec -u www-data "$CONTAINER" test -x "$APP_DIR"
+docker exec -u www-data "$CONTAINER" test -r "$APP_DIR/appinfo/info.xml"
 
 # Führt ausstehende Datenbankschema-Migrationen aus und aktiviert die App.
 docker exec -u www-data "$CONTAINER" php occ upgrade
