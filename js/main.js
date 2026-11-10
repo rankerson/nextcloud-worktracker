@@ -727,7 +727,7 @@
             root.append(projectSection);
 
             const reportSection = section(translate('Reporting & export'));
-            const reportFilters = document.createElement('form');
+            const reportFilters = document.createElement('div');
             reportFilters.className = 'worktracker-report-filters';
             const fromLabel = document.createElement('label');
             fromLabel.className = 'worktracker-field';
@@ -735,6 +735,8 @@
             fromCaption.textContent = translate('From');
             const fromInput = document.createElement('input');
             fromInput.type = 'date';
+            fromInput.id = 'worktracker-report-from';
+            fromInput.name = 'from';
             fromInput.value = dateInputValue(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
             fromLabel.append(fromCaption, fromInput);
             const toLabel = document.createElement('label');
@@ -743,28 +745,42 @@
             toCaption.textContent = translate('To');
             const toInput = document.createElement('input');
             toInput.type = 'date';
+            toInput.id = 'worktracker-report-to';
+            toInput.name = 'to';
             toInput.value = dateInputValue(new Date());
             toLabel.append(toCaption, toInput);
             const showReport = document.createElement('button');
-            showReport.type = 'submit';
+            showReport.type = 'button';
             showReport.className = 'worktracker-button';
             showReport.textContent = translate('Run report');
             reportFilters.append(fromLabel, toLabel, showReport);
             reportSection.append(reportFilters);
+            const reportFeedback = document.createElement('p');
+            reportFeedback.className = 'worktracker-report-feedback';
+            reportFeedback.setAttribute('role', 'status');
+            reportFeedback.setAttribute('aria-live', 'polite');
+            reportFeedback.hidden = true;
+            reportSection.append(reportFeedback);
             const reportContent = document.createElement('div');
             reportContent.className = 'worktracker-report-content';
             reportSection.append(reportContent);
-            reportFilters.addEventListener('submit', async event => {
-                event.preventDefault();
+
+            const runReport = async () => {
                 showReport.disabled = true;
+                reportFeedback.hidden = true;
+                reportFeedback.textContent = '';
                 try {
                     await renderReport(reportContent, fromInput.value, toInput.value, projects);
                 } catch (error) {
-                    showMessage(error.message || translate('Could not load report'), true);
+                    reportFeedback.className = 'worktracker-notice error worktracker-report-feedback';
+                    reportFeedback.textContent = error.message || translate('Could not load report');
+                    reportFeedback.hidden = false;
                 } finally {
                     showReport.disabled = false;
                 }
-            });
+            };
+            showReport.addEventListener('click', runReport);
+
             root.append(reportSection);
             await renderReport(reportContent, fromInput.value, toInput.value, projects);
 
