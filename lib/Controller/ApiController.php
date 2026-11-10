@@ -139,7 +139,7 @@ class ApiController extends Controller {
         try {
             $this->entryService->delete($this->uid(), $type, $id);
             return new JSONResponse(['success' => true]);
-        } catch (\InvalidArgumentException $e) {
+        } catch (\InvalidArgumentException|\DomainException $e) {
             return new JSONResponse(['error' => $e->getMessage()], 400);
         }
     }
