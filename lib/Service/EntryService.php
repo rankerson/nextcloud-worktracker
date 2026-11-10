@@ -87,54 +87,22 @@ class EntryService {
         $old = $this->findOwned($table, $uid, $id);
         if (!$old) throw new \DomainException('Zeitbuchung nicht gefunden.');
         [$start, $end] = $this->validateRange($data);
-        $targetType = (string)($data['type'] ?? $type);
-        if (!isset(self::TABLES[$targetType]) || (($type === 'project' || $targetType === 'project') && $type !== $targetType)) {
-            throw new \InvalidArgumentException('Projektzeiten können nicht in Arbeits- oder Pausenbuchungen umgewandelt werden.');
+        $this->validateNoOverlap($uid, $type, $start, $end, $id);
+        $qb = $this->db->getQueryBuilder();
+        $qb->update($table)
+            ->set('start_ts', $qb->createNamedParameter($start))
+            ->set('end_ts', $qb->createNamedParameter($end))
+            ->set('updated_at', $qb->createNamedParameter(time()));
+        if ($type === 'pause') {
+            $qb->set('rounded_seconds', $qb->createNamedParameter(TimeMath::roundToQuarterHour($end - $start)));
         }
-
-        if ($targetType !== $type) {
-            if ($targetType === 'pause' && !$this->isWithinWork($uid, $start, $end, $type === 'work' ? $id : null)) {
-                throw new \DomainException('Pausen müssen vollständig innerhalb einer anderen Arbeitszeit liegen.');
-            }
-            $this->validateNoOverlap($uid, $targetType, $start, $end);
-            $values = [
-                'user_id' => $uid,
-                'start_ts' => $start,
-                'end_ts' => $end,
-                'created_at' => (int)($old['created_at'] ?? time()),
-                'updated_at' => time(),
-            ];
-            if ($targetType === 'pause') {
-                $values['rounded_seconds'] = TimeMath::roundToQuarterHour($end - $start);
-            }
-            $insert = $this->db->getQueryBuilder();
-            $insert->insert(self::TABLES[$targetType]);
-            foreach ($values as $key => $value) $insert->setValue($key, $insert->createNamedParameter($value));
-            $insert->executeStatement();
-
-            $delete = $this->db->getQueryBuilder();
-            $delete->delete($table)
-                ->where($delete->expr()->eq('id', $delete->createNamedParameter($id)))
-                ->andWhere($delete->expr()->eq('user_id', $delete->createNamedParameter($uid)))
-                ->executeStatement();
-        } else {
-            $this->validateNoOverlap($uid, $type, $start, $end, $id);
-            $qb = $this->db->getQueryBuilder();
-            $qb->update($table)
-                ->set('start_ts', $qb->createNamedParameter($start))
-                ->set('end_ts', $qb->createNamedParameter($end))
-                ->set('updated_at', $qb->createNamedParameter(time()));
-            if ($type === 'pause') {
-                $qb->set('rounded_seconds', $qb->createNamedParameter(TimeMath::roundToQuarterHour($end - $start)));
-            }
-            if ($type === 'project') {
-                $projectId = $this->validateProject($uid, (int)($data['project_id'] ?? $old['project_id']));
-                $qb->set('project_id', $qb->createNamedParameter($projectId));
-            }
-            $qb->where($qb->expr()->eq('id', $qb->createNamedParameter($id)))
-                ->andWhere($qb->expr()->eq('user_id', $qb->createNamedParameter($uid)))
-                ->executeStatement();
+        if ($type === 'project') {
+            $projectId = $this->validateProject($uid, (int)($data['project_id'] ?? $old['project_id']));
+            $qb->set('project_id', $qb->createNamedParameter($projectId));
         }
+        $qb->where($qb->expr()->eq('id', $qb->createNamedParameter($id)))
+            ->andWhere($qb->expr()->eq('user_id', $qb->createNamedParameter($uid)))
+            ->executeStatement();
         $this->rebuildAffectedDays($uid, (int)$old['start_ts'], (int)($old['end_ts'] ?? $old['start_ts']));
         $this->rebuildAffectedDays($uid, $start, $end);
     }
@@ -182,14 +150,13 @@ class EntryService {
         }
     }
 
-    private function isWithinWork(string $uid, int $start, int $end, ?int $excludeId = null): bool {
+    private function isWithinWork(string $uid, int $start, int $end): bool {
         $qb = $this->db->getQueryBuilder();
         $qb->select('id')->from('worktracker_work')
             ->where($qb->expr()->eq('user_id', $qb->createNamedParameter($uid)))
             ->andWhere($qb->expr()->lte('start_ts', $qb->createNamedParameter($start)))
-            ->andWhere($qb->expr()->orX($qb->expr()->isNull('end_ts'), $qb->expr()->gte('end_ts', $qb->createNamedParameter($end))));
-        if ($excludeId !== null) $qb->andWhere($qb->expr()->neq('id', $qb->createNamedParameter($excludeId)));
-        $qb->setMaxResults(1);
+            ->andWhere($qb->expr()->orX($qb->expr()->isNull('end_ts'), $qb->expr()->gte('end_ts', $qb->createNamedParameter($end))))
+            ->setMaxResults(1);
         return (bool)$qb->executeQuery()->fetch();
     }
 
