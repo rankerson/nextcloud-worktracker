@@ -14,6 +14,7 @@ BACKUP_FILE=""
 CONTAINER_ARCHIVE="/tmp/worktracker-install-$$.tar.gz"
 MAINTENANCE_ENABLED=0
 INSTALL_STARTED=0
+MIGRATION_STARTED=0
 
 log() { printf '[worktracker] %s\n' "$*"; }
 fail() { log "FEHLER: $*" >&2; exit 1; }
@@ -21,16 +22,25 @@ fail() { log "FEHLER: $*" >&2; exit 1; }
 cleanup() {
   local rc=$?
   if (( rc != 0 && INSTALL_STARTED )); then
-    log "Update fehlgeschlagen. Stelle den vorherigen App-Code wieder her."
-    docker exec "$CONTAINER" rm -rf "$APP_DIR" || true
-    if [[ -n "$BACKUP_FILE" && -f "$BACKUP_FILE" ]]; then
-      docker cp "$BACKUP_FILE" "$CONTAINER:$CONTAINER_ARCHIVE" || true
-      docker exec "$CONTAINER" tar -xzf "$CONTAINER_ARCHIVE" -C "$APP_ROOT" || true
-      docker exec "$CONTAINER" rm -f "$CONTAINER_ARCHIVE" || true
+    if (( MIGRATION_STARTED )); then
+      log "Fehler während/nach der Migrationsphase. Der neue App-Code bleibt installiert, da ein Code-Rollback bei möglicherweise bereits geänderten Datenbanktabellen inkonsistent wäre."
+    else
+      log "Installation fehlgeschlagen. Stelle den vorherigen App-Code wieder her."
+      docker exec "$CONTAINER" rm -rf "$APP_DIR" || true
+      if [[ -n "$BACKUP_FILE" && -f "$BACKUP_FILE" ]]; then
+        docker cp "$BACKUP_FILE" "$CONTAINER:$CONTAINER_ARCHIVE" || true
+        docker exec "$CONTAINER" tar -xzf "$CONTAINER_ARCHIVE" -C "$APP_ROOT" || true
+        docker exec "$CONTAINER" rm -f "$CONTAINER_ARCHIVE" || true
+      fi
+    fi
+    # occ upgrade verwaltet den Wartungsmodus selbst. Bei einem Fehler
+    # kann er dennoch aktiv bleiben, daher hier ausdrücklich ausschalten.
+    docker exec -u www-data "$CONTAINER" php occ maintenance:mode --off || true
+    MAINTENANCE_ENABLED=0
+    if [[ -n "$BACKUP_FILE" && -f "$BACKUP_FILE" ]] && (( ! MIGRATION_STARTED )); then
       docker exec -u www-data "$CONTAINER" php occ app:enable "$APP_ID" >/dev/null 2>&1 || true
     fi
-  fi
-  if (( MAINTENANCE_ENABLED )); then
+  elif (( MAINTENANCE_ENABLED )); then
     docker exec -u www-data "$CONTAINER" php occ maintenance:mode --off || true
   fi
   docker exec "$CONTAINER" rm -f "$CONTAINER_ARCHIVE" >/dev/null 2>&1 || true
@@ -80,7 +90,15 @@ docker exec "$CONTAINER" rm -f "$CONTAINER_ARCHIVE"
 docker exec -u www-data "$CONTAINER" test -x "$APP_DIR"
 docker exec -u www-data "$CONTAINER" test -r "$APP_DIR/appinfo/info.xml"
 
-# Führt ausstehende Datenbankschema-Migrationen aus und aktiviert die App.
+# occ upgrade verwaltet den Wartungsmodus selbst. Deshalb muss der
+# zuvor zum Austausch des App-Codes aktivierte Wartungsmodus hier aus sein.
+docker exec -u www-data "$CONTAINER" php occ maintenance:mode --off
+MAINTENANCE_ENABLED=0
+
+# Führt ausstehende Datenbankschema- und App-Migrationen aus.
+# Ab hier wird bei Fehlern kein automatischer Code-Rollback mehr versucht,
+# weil Datenbankmigrationen bereits teilweise ausgeführt worden sein könnten.
+MIGRATION_STARTED=1
 docker exec -u www-data "$CONTAINER" php occ upgrade
 docker exec -u www-data "$CONTAINER" php occ app:enable "$APP_ID"
 docker exec -u www-data "$CONTAINER" php occ app:list | grep -q "$APP_ID" || fail "App konnte nicht aktiviert werden."
