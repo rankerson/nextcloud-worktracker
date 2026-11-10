@@ -52,3 +52,27 @@
 #worktracker-app .worktracker-controls{gap:6px;margin-top:10px}
 #worktracker-app .worktracker-button:disabled{opacity:.5}
 @media(max-width:700px){#worktracker-app{padding:12px}.worktracker-metric{flex:1 1 100%}.worktracker-project-form{grid-template-columns:1fr}}
+
+/* Let Nextcloud's app content area scroll when this page is taller than the viewport. */
+#app-content:has(#worktracker-app) {
+    min-height: 0;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+}
+#worktracker-app.worktracker-app-page {
+    height: auto;
+    min-height: 100%;
+    overflow: visible;
+    box-sizing: border-box;
+}
+.worktracker-entries-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+.worktracker-entries-header h3 { margin: 0; }
+.worktracker-entry-creator { margin: 10px 0 14px; }
+.worktracker-entry-creator [hidden] { display: none !important; }

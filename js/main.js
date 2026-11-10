@@ -194,11 +194,127 @@
         });
         container.append(exports);
 
+        const entriesHeader = document.createElement('div');
+        entriesHeader.className = 'worktracker-entries-header';
         const entriesHeading = document.createElement('h3');
         entriesHeading.textContent = translate('Recorded entries');
-        container.append(entriesHeading);
+        const addEntry = document.createElement('button');
+        addEntry.type = 'button';
+        addEntry.className = 'worktracker-button';
+        addEntry.textContent = translate('Add time entry');
+        entriesHeader.append(entriesHeading, addEntry);
+        container.append(entriesHeader);
+
         const entryList = document.createElement('div');
         entryList.className = 'worktracker-report-list';
+
+        addEntry.addEventListener('click', () => {
+            if (container.querySelector('.worktracker-entry-creator')) return;
+            const editor = document.createElement('form');
+            editor.className = 'worktracker-project-form worktracker-entry-editor worktracker-entry-creator';
+            const heading = document.createElement('h4');
+            heading.textContent = translate('Add a missed time interval');
+            editor.append(heading);
+
+            const addField = (labelText, name, type, value) => {
+                const wrapper = document.createElement('label');
+                wrapper.className = 'worktracker-field';
+                const caption = document.createElement('span');
+                caption.textContent = labelText;
+                const input = document.createElement('input');
+                input.type = type;
+                input.name = name;
+                input.value = value;
+                input.required = true;
+                wrapper.append(caption, input);
+                editor.append(wrapper);
+                return input;
+            };
+            const typeWrapper = document.createElement('label');
+            typeWrapper.className = 'worktracker-field';
+            const typeCaption = document.createElement('span');
+            typeCaption.textContent = translate('Entry type');
+            const typeInput = document.createElement('select');
+            typeInput.name = 'type';
+            [
+                ['work', translate('Working time')],
+                ['pause', translate('Break')],
+                ['project', translate('Project time')],
+            ].forEach(([value, label]) => {
+                const option = document.createElement('option');
+                option.value = value;
+                option.textContent = label;
+                typeInput.append(option);
+            });
+            typeWrapper.append(typeCaption, typeInput);
+            editor.append(typeWrapper);
+
+            const startInput = addField(translate('Start'), 'start_ts', 'datetime-local', '');
+            const endInput = addField(translate('End'), 'end_ts', 'datetime-local', '');
+
+            const projectWrapper = document.createElement('label');
+            projectWrapper.className = 'worktracker-field';
+            const projectCaption = document.createElement('span');
+            projectCaption.textContent = translate('Project');
+            const projectInput = document.createElement('select');
+            projectInput.name = 'project_id';
+            projects.forEach(project => {
+                const option = document.createElement('option');
+                option.value = project.id;
+                option.textContent = project.name;
+                projectInput.append(option);
+            });
+            projectWrapper.append(projectCaption, projectInput);
+            editor.append(projectWrapper);
+            const syncProjectField = () => {
+                projectWrapper.hidden = typeInput.value !== 'project';
+                projectInput.required = typeInput.value === 'project';
+            };
+            typeInput.addEventListener('change', syncProjectField);
+            syncProjectField();
+
+            const buttons = document.createElement('div');
+            buttons.className = 'worktracker-controls';
+            const save = document.createElement('button');
+            save.type = 'submit';
+            save.className = 'worktracker-button';
+            save.textContent = translate('Save');
+            const cancel = document.createElement('button');
+            cancel.type = 'button';
+            cancel.className = 'worktracker-button';
+            cancel.textContent = translate('Cancel');
+            cancel.addEventListener('click', () => {
+                editor.remove();
+                addEntry.disabled = false;
+            });
+            buttons.append(save, cancel);
+            editor.append(buttons);
+            entriesHeader.after(editor);
+            addEntry.disabled = true;
+
+            editor.addEventListener('submit', async event => {
+                event.preventDefault();
+                save.disabled = true;
+                try {
+                    const startTs = Math.floor(new Date(startInput.value).getTime() / 1000);
+                    const endTs = Math.floor(new Date(endInput.value).getTime() / 1000);
+                    if (!Number.isFinite(startTs) || !Number.isFinite(endTs) || endTs <= startTs) {
+                        throw new Error(translate('End must be after start.'));
+                    }
+                    const payload = { type: typeInput.value, start_ts: startTs, end_ts: endTs };
+                    if (payload.type === 'project') {
+                        payload.project_id = Number(projectInput.value);
+                        if (!payload.project_id) throw new Error(translate('Please select a project.'));
+                    }
+                    await request('entries', 'POST', payload);
+                    await renderReport(container, fromDate, toDate, projects);
+                } catch (error) {
+                    showMessage(error.message || translate('Could not create entry'), true);
+                    save.disabled = false;
+                }
+            });
+        });
+
         entries.forEach(entry => {
             const row = document.createElement('div');
             row.className = 'worktracker-report-row worktracker-entry-row';
@@ -650,7 +766,7 @@
                 }
             });
             root.append(reportSection);
-            await renderReport(reportContent, fromInput.value, toInput.value);
+            await renderReport(reportContent, fromInput.value, toInput.value, projects);
 
             const updated = document.createElement('p');
             updated.className = 'worktracker-updated';
