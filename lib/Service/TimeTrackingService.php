@@ -102,7 +102,7 @@ class TimeTrackingService {
             'active_project_id' => $project ? (int)$project['project_id'] : null,
             'work_elapsed_seconds' => $gross,
             'work_rounded_seconds' => TimeMath::roundToQuarterHour($gross),
-            'pause_elapsed_seconds' => $pause ? max(0, $now - (int)$pause['start_ts']) : 0,
+            'pause_elapsed_seconds' => $pauseSeconds,
             'pause_rounded_seconds' => $pauseRounded,
             'active_project_elapsed_seconds' => $project ? max(0, $now - (int)$project['start_ts']) : 0,
             'project_seconds' => $projectSeconds,
