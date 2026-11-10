@@ -525,9 +525,13 @@
                 row.className = 'worktracker-project-time-row';
                 const name = document.createElement('span');
                 name.textContent = projectById.get(String(id)) || (translate('Project') + ' #' + id);
-                const duration = document.createElement('strong');
-                duration.textContent = formatSeconds(projectTimeTotals[id]) + ' / ' + formatSeconds(projectTimeRounded[id] || 0);
-                duration.title = translate('Actual / rounded');
+                const duration = document.createElement('div');
+                duration.className = 'worktracker-dual-time';
+                const exact = document.createElement('strong');
+                exact.textContent = formatSeconds(projectTimeTotals[id]);
+                const rounded = document.createElement('small');
+                rounded.textContent = translate('Rounded') + ': ' + formatSeconds(projectTimeRounded[id] || 0);
+                duration.append(exact, rounded);
                 row.append(name, duration);
                 projectTimeList.append(row);
             });
