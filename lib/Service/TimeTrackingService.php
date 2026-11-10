@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace OCA\WorkTracker\Service;
 
-use OCP\DB\IDBConnection;
+use OCP\IDBConnection;
 use OCP\IConfig;
 
 class TimeTrackingService {
