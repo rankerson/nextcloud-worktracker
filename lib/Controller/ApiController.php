@@ -30,7 +30,7 @@ class ApiController extends Controller {
     public function status(): JSONResponse {
         try {
             return new JSONResponse($this->timeService->getStatus($this->uid()));
-        } catch (\\Throwable $e) {
+        } catch (\Throwable $e) {
             return new JSONResponse(['error' => 'Der Status konnte nicht geladen werden.'], 500);
         }
     }
@@ -69,7 +69,7 @@ class ApiController extends Controller {
     public function listProjects(): JSONResponse {
         try {
             return new JSONResponse($this->timeService->listProjects($this->uid(), true));
-        } catch (\\Throwable $e) {
+        } catch (\Throwable $e) {
             return new JSONResponse(['error' => 'Die Projekte konnten nicht geladen werden.'], 500);
         }
     }
