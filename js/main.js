@@ -253,9 +253,8 @@
             typeWrapper.append(typeCaption, typeInput);
             editor.append(typeWrapper);
 
-            const nowTs = Math.floor(Date.now() / 1000);
-            const startInput = addField(translate('Start'), 'start_ts', 'datetime-local', localValue(nowTs - 3600));
-            const endInput = addField(translate('End'), 'end_ts', 'datetime-local', localValue(nowTs));
+            const startInput = addField(translate('Start'), 'start_ts', 'datetime-local', '');
+            const endInput = addField(translate('End'), 'end_ts', 'datetime-local', '');
 
             const projectWrapper = document.createElement('label');
             projectWrapper.className = 'worktracker-field';
@@ -288,7 +287,10 @@
             cancel.type = 'button';
             cancel.className = 'worktracker-button';
             cancel.textContent = translate('Cancel');
-            cancel.addEventListener('click', () => editor.remove());
+            cancel.addEventListener('click', () => {
+                editor.remove();
+                addEntry.disabled = false;
+            });
             buttons.append(save, cancel);
             editor.append(buttons);
             entriesHeader.after(editor);
