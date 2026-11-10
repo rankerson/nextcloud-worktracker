@@ -132,10 +132,16 @@
             const seconds = Math.max(0, end - start);
             const name = entry.project_name || translate('Unknown project');
             byProject.set(name, (byProject.get(name) || 0) + seconds);
-            const date = new Date(start * 1000);
-            const day = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
-            const key = name + '|' + day;
-            byProjectRoundedDaily.set(key, (byProjectRoundedDaily.get(key) || 0) + seconds);
+            let cursor = start;
+            while (cursor < end) {
+                const date = new Date(cursor * 1000);
+                const nextDay = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1).getTime() / 1000;
+                const partEnd = Math.min(end, nextDay);
+                const day = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+                const key = name + '|' + day;
+                byProjectRoundedDaily.set(key, (byProjectRoundedDaily.get(key) || 0) + partEnd - cursor);
+                cursor = partEnd;
+            }
         });
         const projectHeading = document.createElement('h3');
         projectHeading.textContent = translate('Time by project');
